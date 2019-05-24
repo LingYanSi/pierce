@@ -3,7 +3,9 @@ const app = new Koa();
 
 // proxy客户端长轮训，等待请求到来
 class Holders {
-    cache = {}
+    constructor() {
+        this.cache = {}
+    }
     set(id, ctx) {
         console.log(`|proxy client connect| id:${id}`)
         this.cache[id] = this.cache[id] || []
@@ -18,7 +20,9 @@ class Holders {
 
 // 事件订阅派发
 class Pub {
-    cache = {}
+    constructor() {
+        this.cache = {}
+    }
     on(id, callback) {
         this.cache[id] = callback
     }
