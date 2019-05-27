@@ -5,15 +5,34 @@ const app = new Koa();
 class Holders {
     constructor() {
         this.cache = {}
+        this.promiseQueue = {}
     }
     set(id, ctx) {
         console.log(`|proxy client connect| id:${id}`)
         this.cache[id] = this.cache[id] || []
         this.cache[id].push(ctx)
+
+        // 消费浏览器过来的请求
+        const promiseQueueID = this.promiseQueue[id]
+        if (promiseQueueID && promiseQueueID.length) {
+            const holder = this.cache[id].pop()
+            promiseQueueID.shift()(holder)
+        }
     }
-    get(id) {
+    async get(id) {
         if (!this.cache[id]) return null
-        const holder = this.cache[id].pop()
+
+        let holder = this.cache[id].pop()
+        this.cache[id] = []
+        if (holder) {
+            return holder
+        }
+
+        console.log('wait proxy client connect ---')
+        holder = await new Promise(res => {
+            this.promiseQueue.push(res)
+        })
+        console.log('proxy client connect')
         return holder
     }
 }
@@ -61,34 +80,33 @@ function uuid(length = 16) {
 app.use(async (ctx) => {
     if (ctx.path == '/api/pierce') {
         const { url, clientId } = ctx.request.query
-        const holder = holders.get(clientId)
-
-        if (holder) {
-            // 请求转发给client
-            const id = uuid()
-            continueCtx(holder, {
-                // headers: ctx.request.header,
-                url,
-                id,
-            })
-
-            // 等到收到client发送过来的响应
-            pub.on(id, (newPipe, header) => {
-                continueCtx(ctx)
-                Object.keys(header).forEach(key => {
-                    ctx.set(key, header[key])
-                })
-                console.log('data to requester')
-                ctx.body = newPipe
-            })
-
-            // 响应请求
-            await waitCtxContinue(() => {}, ctx)
-        } else {
-            const msg = 'NO CLIENT CONNECT'
-            console.log(msg)
-            ctx.body = msg
+        const holder = await holders.get(clientId)
+        if (!holder) {
+            ctx.body = 'no proxy client connect'
+            return
         }
+
+        // 等待holder过来
+        // 请求转发给client
+        const id = uuid()
+        continueCtx(holder, {
+            // headers: ctx.request.header,
+            url,
+            id,
+        })
+
+        // 等到收到client发送过来的响应
+        pub.on(id, (newPipe, header) => {
+            continueCtx(ctx)
+            Object.keys(header).forEach(key => {
+                ctx.set(key, header[key])
+            })
+            console.log('data to requester')
+            ctx.body = newPipe
+        })
+
+        // 响应请求
+        await waitCtxContinue(() => {}, ctx)
     } else if (ctx.path == '/api/pierce/receive') {
         const { id } = ctx.request.query
         pub.trigger(id, ctx.req, ctx.request.header)
