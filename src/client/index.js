@@ -1,22 +1,24 @@
 const request = require('request')
 
-const { ip: IP, port: PORT, subDomain } = (() => {
+const { host, port, id } = (() => {
     const config = {}
     process.argv.slice(2).forEach(item => {
         const [key, value] = item.split('=')
         config[key] = value
     })
+    console.log(config)
     return config
-})
+})()
 
-const HOST = 'http://' + [IP, PORT].filter(i => i).join(':')
+const HOST = 'http://' + host
 
 function fakeServer() {
     // 请求响应后立即再次请求
-    request.get(`${HOST}/api/pierce/holder?id=${subDomain}`, (err, response, body) => {
+    request.get(`${HOST}/api/pierce/holder?id=${id}`, (err, response, body) => {
         if (err) {
             console.log('proxy server error', err)
             console.log('your can restart the proxy client')
+            setTimeout(fakeServer, 3000)
             return
         }
         let data = {}
@@ -26,8 +28,11 @@ function fakeServer() {
             console.log('data parse error')
         }
 
-        const { url, id, headers } = data;
+        let { url, id, headers } = data;
         if (url && id) {
+            // replace hostname
+            url = url.replace(/https?:\/{2}([^?./#]+\.)+[^?./#]+/, ['http://127.0.0.1', port].join(':'))
+            console.log(url)
             request(url)
                .pipe(
                    request.post(`${HOST}/api/pierce/receive?id=${id}`, () => {
