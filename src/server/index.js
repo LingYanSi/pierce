@@ -7,9 +7,10 @@ class Holders {
         this.cache = {}
         this.promiseQueue = {}
     }
+
     set(id, ctx) {
-        console.log(`|proxy client connect| id:${id}`)
-        this.cache[id] = this.cache[id] || []
+        console.log(`proxy client connect ID:${id}`)
+        this.cache[id] = []
         this.cache[id].push(ctx)
 
         // 消费浏览器过来的请求
@@ -19,18 +20,19 @@ class Holders {
             promiseQueueID.shift()(holder)
         }
     }
-    async get(id) {
-        if (!this.cache[id]) return null
 
-        let holder = this.cache[id].pop()
-        this.cache[id] = []
-        if (holder) {
+    async get(id) {
+        console.log('holder cache length:', this.cache[id] && this.cache[id].length)
+        if (this.cache[id] && this.cache[id].length) {
+            let holder = this.cache[id].pop()
+            this.cache[id] = []
             return holder
         }
 
         console.log('wait proxy client connect ---')
-        holder = await new Promise(res => {
-            this.promiseQueue.push(res)
+        const holder = await new Promise(res => {
+            this.promiseQueue[id] = this.promiseQueue[id] || []
+            this.promiseQueue[id].push(res)
         })
         console.log('proxy client connect')
         return holder
