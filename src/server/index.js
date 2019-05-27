@@ -80,8 +80,24 @@ function uuid(length = 16) {
 // 只实现简单的get请求转发
 // response
 app.use(async (ctx) => {
-    if (ctx.path == '/api/pierce') {
-        const { url, clientId } = ctx.request.query
+    if (ctx.path.startsWith('/api/proxy/clientId/')) {
+        let clientId = ''
+        const url = ctx.path.replace(/\/api\/proxy\/clientId\/([^/]+)\//, ($a, $1) => {
+            clientId = $1
+            return ''
+        })
+
+        if (!clientId) {
+            ctx.body = 'clientId empty!!!'
+            return;
+        }
+
+        if (!url) {
+            ctx.body = 'url empty!!!'
+            return
+        }
+
+        // const { url = defaultUrl, clientId } = ctx.request.query
         const holder = await holders.get(clientId)
         if (!holder) {
             ctx.body = 'no proxy client connect'
