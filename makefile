@@ -5,4 +5,4 @@ start:
 
 reload:
 	git pull --rebase origin master
-	pm2 reload $(SERVERNAME)"
+	pm2 reload $(SERVERNAME)
